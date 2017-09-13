@@ -96,8 +96,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    siblingsToAppend = args.siblingsToAppend + map(lambda path: readfile(path), args.fileSiblingsToAppend or [])
-    childrenToAppend = args.childrenToAppend + map(lambda path: readfile(path), args.fileChildrenToAppend or [])
+    siblingsToAppend = args.siblingsToAppend + map(lambda path: readfile(path), args.fileSiblingsToAppend)
+    childrenToAppend = args.childrenToAppend + map(lambda path: readfile(path), args.fileChildrenToAppend)
 
     try:
         main(
