@@ -19,7 +19,7 @@ def parseNameValuePairs(nameValuePairStrList):
     if nameValuePairStrList is None:
         return {}
 
-    return dict(map(lambda x: x.split("="), nameValuePairStrList))
+    return dict(map(lambda x: x.split("=", 1), nameValuePairStrList))
 
 def readfile(filepath):
     with open(filepath) as file:
