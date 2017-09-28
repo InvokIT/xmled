@@ -9,7 +9,7 @@ from lxml import etree as xml
 class ExpressionNotFoundException(Exception):
     pass
 
-class ConfusingOutputArguments(Exception):
+class ConfusingOutputArgumentsException(Exception):
     pass
 
 def eprint(*args, **kwargs):
@@ -22,8 +22,17 @@ def parseNameValuePairs(nameValuePairStrList):
     return dict(map(lambda x: x.split("=", 1), nameValuePairStrList))
 
 def readfile(filepath):
-    with open(filepath) as file:
-        return file.read()
+    if filepath == "-":
+        return sys.stdin.read()
+    else:
+        with open(filepath) as file:
+            return file.read()
+
+def xmlFragments(fragmentString):
+    wrappedFragments = "<xml>" + fragmentString + "</xml>"
+    fragmentRoot = xml.fromstring(wrappedFragments)
+    fragments = list(fragmentRoot)
+    return fragments
 
 def main(
 sourceFileName,
@@ -38,7 +47,7 @@ siblingsToAppend=[],
 childrenToAppend=[]
 ):
     if inPlace and destinationFileName is not None:
-        raise ConfusingOutputArguments()
+        raise ConfusingOutputArgumentsException()
 
     parser = xml.XMLParser()
 
@@ -61,11 +70,19 @@ childrenToAppend=[]
         for key, value in attributes.iteritems():
             element.set(key, value)
 
-        for sibling in siblingsToAppend:
-            element.addnext(xml.fromstring(sibling))
+        for siblingText in siblingsToAppend:
+            if siblingText is not None and len(siblingText) > 0:
+                for e in xmlFragments(siblingText):
+                    element.addnext(e)
+            else:
+                eprint("WARN: Skipped append of empty XML fragment.")
 
-        for child in childrenToAppend:
-            element.append(xml.fromstring(child))
+        for childText in childrenToAppend:
+            if childText is not None and len(childText) > 0:
+                for e in xmlFragments(childText):
+                    element.append(e)
+            else:
+                eprint("WARN: Skipped append of empty XML fragment.")
 
     resultXml = xml.tostring(root, encoding='UTF-8', xml_declaration=True, pretty_print=True)
 
@@ -91,8 +108,8 @@ if __name__ == "__main__":
     parser.add_argument("-a", "--attribute", action='append', help="Set an attribute value on matched elements.", dest="attributes", default=[])
     parser.add_argument("-as", "--append-sibling", action='append', help="Append an XML fragment as siblings to matched elements.", dest="siblingsToAppend", default=[])
     parser.add_argument("-ac", "--append-children", action='append', help="Append an XML fragment as children to matched elements.", dest="childrenToAppend", default=[])
-    parser.add_argument("-asf", "--append-sibling-file", action='append', help="Append an XML fragment from file as siblings to matched elements.", dest="fileSiblingsToAppend", default=[])
-    parser.add_argument("-acf", "--append-children-file", action='append', help="Append an XML fragment from file as children to matched elements.", dest="fileChildrenToAppend", default=[])
+    parser.add_argument("-asf", "--append-sibling-from-file", action='append', help="Append an XML fragment from file as siblings to matched elements.", dest="fileSiblingsToAppend", default=[])
+    parser.add_argument("-acf", "--append-children-from-file", action='append', help="Append an XML fragment from file as children to matched elements.", dest="fileChildrenToAppend", default=[])
 
     args = parser.parse_args()
 
@@ -117,7 +134,7 @@ if __name__ == "__main__":
     except ExpressionNotFoundException:
         eprint(str.format("ERROR: No elements matching {0} found.", args.xPathExpression))
         sys.exit(1)
-    except ConfusingOutputArguments:
+    except ConfusingOutputArgumentsException:
         eprint(str.format("ERROR: Invalid options - Both --in-place and --output specified."))
         sys.exit(2)
     except xml.XPathEvalError as ex:
