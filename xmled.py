@@ -9,7 +9,7 @@ from lxml import etree as xml
 class ExpressionNotFoundException(Exception):
     pass
 
-class ConfusingOutputArgumentsException(Exception):
+class ConfusingOutputArguments(Exception):
     pass
 
 def eprint(*args, **kwargs):
@@ -22,17 +22,8 @@ def parseNameValuePairs(nameValuePairStrList):
     return dict(map(lambda x: x.split("=", 1), nameValuePairStrList))
 
 def readfile(filepath):
-    if filepath == "-":
-        return sys.stdin.read()
-    else:
-        with open(filepath) as file:
-            return file.read()
-
-def xmlFragments(fragmentString):
-    wrappedFragments = "<xml>" + fragmentString + "</xml>"
-    fragmentRoot = xml.fromstring(wrappedFragments)
-    fragments = list(fragmentRoot)
-    return fragments
+    with open(filepath) as file:
+        return file.read()
 
 def main(
 sourceFileName,
@@ -47,7 +38,7 @@ siblingsToAppend=[],
 childrenToAppend=[]
 ):
     if inPlace and destinationFileName is not None:
-        raise ConfusingOutputArgumentsException()
+        raise ConfusingOutputArguments()
 
     parser = xml.XMLParser()
 
@@ -70,19 +61,11 @@ childrenToAppend=[]
         for key, value in attributes.iteritems():
             element.set(key, value)
 
-        for siblingText in siblingsToAppend:
-            if siblingText is not None and len(siblingText) > 0:
-                for e in xmlFragments(siblingText):
-                    element.addnext(e)
-            else:
-                eprint("WARN: Skipped append of empty XML fragment.")
+        for sibling in siblingsToAppend:
+            element.addnext(xml.fromstring(sibling))
 
-        for childText in childrenToAppend:
-            if childText is not None and len(childText) > 0:
-                for e in xmlFragments(childText):
-                    element.append(e)
-            else:
-                eprint("WARN: Skipped append of empty XML fragment.")
+        for child in childrenToAppend:
+            element.append(xml.fromstring(child))
 
     resultXml = xml.tostring(root, encoding='UTF-8', xml_declaration=True, pretty_print=True)
 
@@ -103,13 +86,13 @@ if __name__ == "__main__":
     parser.add_argument("xPathExpression", help="XPath expression to elements that should be modified.")
     parser.add_argument("-o", "--output", help="The output file. Default: stdout", default=None, dest="destination")
     parser.add_argument("-i", "--in-place", action='store_true', help="Overwrite source document.", dest="inplace")
-    parser.add_argument("-ns, --namespace", action='append', help="Specify namespaces. Can be used multiple times. Syntax: 'a=<namespace url>'", dest="namespaces", default=[])
+    parser.add_argument("-ns", "--namespace", action='append', help="Specify namespaces. Can be used multiple times. Syntax: 'a=<namespace url>'", dest="namespaces", default=[])
     parser.add_argument("-t", "--text", help="Replace the text of matched elements.", dest="text")
     parser.add_argument("-a", "--attribute", action='append', help="Set an attribute value on matched elements.", dest="attributes", default=[])
     parser.add_argument("-as", "--append-sibling", action='append', help="Append an XML fragment as siblings to matched elements.", dest="siblingsToAppend", default=[])
     parser.add_argument("-ac", "--append-children", action='append', help="Append an XML fragment as children to matched elements.", dest="childrenToAppend", default=[])
-    parser.add_argument("-asf", "--append-sibling-from-file", action='append', help="Append an XML fragment from file as siblings to matched elements.", dest="fileSiblingsToAppend", default=[])
-    parser.add_argument("-acf", "--append-children-from-file", action='append', help="Append an XML fragment from file as children to matched elements.", dest="fileChildrenToAppend", default=[])
+    parser.add_argument("-asf", "--append-sibling-file", action='append', help="Append an XML fragment from file as siblings to matched elements.", dest="fileSiblingsToAppend", default=[])
+    parser.add_argument("-acf", "--append-children-file", action='append', help="Append an XML fragment from file as children to matched elements.", dest="fileChildrenToAppend", default=[])
 
     args = parser.parse_args()
 
@@ -134,7 +117,7 @@ if __name__ == "__main__":
     except ExpressionNotFoundException:
         eprint(str.format("ERROR: No elements matching {0} found.", args.xPathExpression))
         sys.exit(1)
-    except ConfusingOutputArgumentsException:
+    except ConfusingOutputArguments:
         eprint(str.format("ERROR: Invalid options - Both --in-place and --output specified."))
         sys.exit(2)
     except xml.XPathEvalError as ex:
